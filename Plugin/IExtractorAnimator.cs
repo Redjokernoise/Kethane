@@ -7,10 +7,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NearFuture
+namespace Kethane
 {
     // State defining whether radiators are retracted
-    public enum RadiatorState
+    public enum ExtractorState
     {
         Deployed,
         Deploying,
@@ -18,9 +18,9 @@ namespace NearFuture
         Retracting,
     }
 
-    public interface IFissionGeneratorAnimator
+    public interface IExtractorAnimator
     {
-        RadiatorState CurrentState { get; }
+        ExtractorState CurrentState { get; }
         void Deploy();
         void Retract();
     }

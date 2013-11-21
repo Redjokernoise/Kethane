@@ -8,9 +8,9 @@ using System;
 using System.Linq;
 using UnityEngine;
 
-namespace NearFuture
+namespace Kethane
 {
-    public class FissionGeneratorAnimator : PartModule, IFissionGeneratorAnimator
+    public class KethaneDrillAnimator : PartModule, IExtractorAnimator
     {
         //
         [KSPField(isPersistant = false)]
@@ -23,19 +23,13 @@ namespace NearFuture
 
         public override void OnStart(PartModule.StartState state)
         {
-            deployStates = Utils.SetUpAnimation(DeployAnimation, this.part);
+            deployStates = Misc.SetUpAnimation(DeployAnimation, this.part);
 
 
-            if (CurrentState == RadiatorState.Deploying)
-            {
-                CurrentState = RadiatorState.Retracted;
-            }
-            else if (CurrentState == RadiatorState.Retracting)
-            {
-                CurrentState = RadiatorState.Deployed;
-            }
+            if (CurrentState == ExtractorState.Deploying) { CurrentState = ExtractorState.Retracted; }
+            else if (CurrentState == ExtractorState.Retracting) { CurrentState = ExtractorState.Deployed; }
 
-            if (CurrentState == RadiatorState.Deployed)
+            if (CurrentState == ExtractorState.Deployed)
             {
                 foreach (AnimationState deployState in deployStates)
                 {
@@ -46,34 +40,31 @@ namespace NearFuture
 
         }
 
-        public RadiatorState CurrentState
+        public ExtractorState CurrentState
         {
             get
             {
                 try
                 {
-                    return (RadiatorState)Enum.Parse(typeof(RadiatorState), State);
+                    return (ExtractorState)Enum.Parse(typeof(ExtractorState), State);
                 }
                 catch
                 {
-                    CurrentState = RadiatorState.Retracted;
+                    CurrentState = ExtractorState.Retracted;
                     return CurrentState;
                 }
             }
             private set
             {
 
-                State = Enum.GetName(typeof(RadiatorState), value);
+                State = Enum.GetName(typeof(ExtractorState), value);
             }
         }
 
         public void Deploy()
         {
-            if (CurrentState != RadiatorState.Retracted)
-            {
-                return;
-            }
-            CurrentState = RadiatorState.Deploying;
+            if (CurrentState != ExtractorState.Retracted) { return; }
+            CurrentState = ExtractorState.Deploying;
 
             foreach (var state in deployStates)
             {
@@ -83,11 +74,8 @@ namespace NearFuture
 
         public void Retract()
         {
-            if (CurrentState != RadiatorState.Deployed)
-            {
-                return;
-            }
-            CurrentState = RadiatorState.Retracting;
+            if (CurrentState != ExtractorState.Deployed) { return; }
+            CurrentState = ExtractorState.Retracting;
 
             foreach (var state in deployStates)
             {
@@ -102,14 +90,14 @@ namespace NearFuture
                 deployState.normalizedTime = Mathf.Clamp01(deployState.normalizedTime);
             }
 
-            if (CurrentState == RadiatorState.Deploying && deployStates[0].normalizedTime >= 1)
+            if (CurrentState == ExtractorState.Deploying && deployStates[0].normalizedTime >= 1)
             {
-                CurrentState = RadiatorState.Deployed;
+                CurrentState = ExtractorState.Deployed;
 
             }
-            else if (CurrentState == RadiatorState.Retracting && deployStates[0].normalizedTime >= 0)
+            else if (CurrentState == ExtractorState.Retracting && deployStates[0].normalizedTime >= 0)
             {
-                CurrentState = RadiatorState.Retracted;
+                CurrentState = ExtractorState.Retracted;
             }
         }
     }
