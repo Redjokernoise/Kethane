@@ -1,7 +1,16 @@
-﻿
-namespace Kethane
+﻿/// IFissionGeneratorAnimator
+/// ---------------------------------------------------
+/// Interface for the animator of a fission generator
+/// Implement to make these things look right
+/// 
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace NearFuture
 {
-    public enum ExtractorState
+    // State defining whether radiators are retracted
+    public enum RadiatorState
     {
         Deployed,
         Deploying,
@@ -9,9 +18,9 @@ namespace Kethane
         Retracting,
     }
 
-    public interface IExtractorAnimator
+    public interface IFissionGeneratorAnimator
     {
-        ExtractorState CurrentState { get; }
+        RadiatorState CurrentState { get; }
         void Deploy();
         void Retract();
     }

@@ -1,70 +1,80 @@
-﻿using System;
+﻿/// FissionGeneratorAnimator
+/// ---------------------------------------------------
+/// Module defining an animation module for a fission generator
+
+/// TODO: Add heat animation for deployed, retracted states
+
+using System;
 using System.Linq;
 using UnityEngine;
 
-namespace Kethane
+namespace NearFuture
 {
-    public class KethaneDrillAnimator : PartModule, IExtractorAnimator
+    public class FissionGeneratorAnimator : PartModule, IFissionGeneratorAnimator
     {
+        //
         [KSPField(isPersistant = false)]
         public string DeployAnimation;
-
-        [KSPField(isPersistant = false)]
-        public string DrillAnimation;
 
         [KSPField(isPersistant = true)]
         public string State;
 
         private AnimationState[] deployStates;
-        private AnimationState[] drillStates;
 
         public override void OnStart(PartModule.StartState state)
         {
-            deployStates = Misc.SetUpAnimation(DeployAnimation, this.part);
-            drillStates = Misc.SetUpAnimation(DrillAnimation, this.part);
+            deployStates = Utils.SetUpAnimation(DeployAnimation, this.part);
 
-            if (CurrentState == ExtractorState.Deploying) { CurrentState = ExtractorState.Retracted; }
-            else if (CurrentState == ExtractorState.Retracting) { CurrentState = ExtractorState.Deployed; }
 
-            if (CurrentState == ExtractorState.Deployed)
+            if (CurrentState == RadiatorState.Deploying)
             {
-                foreach (var deployState in deployStates)
+                CurrentState = RadiatorState.Retracted;
+            }
+            else if (CurrentState == RadiatorState.Retracting)
+            {
+                CurrentState = RadiatorState.Deployed;
+            }
+
+            if (CurrentState == RadiatorState.Deployed)
+            {
+                foreach (AnimationState deployState in deployStates)
                 {
                     deployState.normalizedTime = 1;
                 }
             }
 
-            foreach (var drillState in drillStates)
-            {
-                drillState.enabled = false;
-                drillState.wrapMode = WrapMode.Loop;
-            }
+
         }
 
-        public ExtractorState CurrentState
+        public RadiatorState CurrentState
         {
             get
             {
                 try
                 {
-                    return (ExtractorState)Enum.Parse(typeof(ExtractorState), State);
+                    return (RadiatorState)Enum.Parse(typeof(RadiatorState), State);
                 }
                 catch
                 {
-                    CurrentState = ExtractorState.Retracted;
+                    CurrentState = RadiatorState.Retracted;
                     return CurrentState;
                 }
             }
             private set
             {
-                State = Enum.GetName(typeof(ExtractorState), value);
+
+                State = Enum.GetName(typeof(RadiatorState), value);
             }
         }
 
         public void Deploy()
         {
-            if (CurrentState != ExtractorState.Retracted) { return; }
-            CurrentState = ExtractorState.Deploying;
+            if (CurrentState != RadiatorState.Retracted)
+            {
+                return;
+            }
+            CurrentState = RadiatorState.Deploying;
+
             foreach (var state in deployStates)
             {
                 state.speed = 1;
@@ -73,14 +83,12 @@ namespace Kethane
 
         public void Retract()
         {
-            if (CurrentState != ExtractorState.Deployed) { return; }
-            CurrentState = ExtractorState.Retracting;
-            foreach (var state in drillStates)
+            if (CurrentState != RadiatorState.Deployed)
             {
-                state.enabled = false;
-                state.normalizedTime = 0;
-                state.speed = 0;
+                return;
             }
+            CurrentState = RadiatorState.Retracting;
+
             foreach (var state in deployStates)
             {
                 state.speed = -1;
@@ -94,19 +102,14 @@ namespace Kethane
                 deployState.normalizedTime = Mathf.Clamp01(deployState.normalizedTime);
             }
 
-            if (CurrentState == ExtractorState.Deploying && deployStates.All(s => s.normalizedTime == 1))
+            if (CurrentState == RadiatorState.Deploying && deployStates[0].normalizedTime >= 1)
             {
-                CurrentState = ExtractorState.Deployed;
-                foreach (var state in drillStates)
-                {
-                    state.enabled = true;
-                    state.normalizedTime = 0;
-                    state.speed = 1;
-                }
+                CurrentState = RadiatorState.Deployed;
+
             }
-            else if (CurrentState == ExtractorState.Retracting && deployStates.All(s => s.normalizedTime == 0))
+            else if (CurrentState == RadiatorState.Retracting && deployStates[0].normalizedTime >= 0)
             {
-                CurrentState = ExtractorState.Retracted;
+                CurrentState = RadiatorState.Retracted;
             }
         }
     }

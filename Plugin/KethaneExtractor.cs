@@ -1,215 +1,200 @@
-﻿using System;
-using System.Linq;
-using UnityEngine;
+﻿/// FissionGenerator
+/// ---------------------------------------------------
+/// FissionGeenrator part module
+
+/// TODO: Figure out how to refresh UI widgets for deploy/retract radiators
+
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using UnityEngine;
 
-namespace Kethane
+namespace NearFuture
 {
-    public class KethaneExtractor : PartModule
+    public class FissionGenerator : PartModule
     {
-        public class Resource
-        {
-            public string Name { get; private set; }
-            public float Rate { get; private set; }
+        // Is generator online
+        [KSPField(isPersistant = true)]
+        public bool Enabled;
 
-            public Resource(ConfigNode node)
-            {
-                Name = node.GetValue("Name");
-                Rate = float.Parse(node.GetValue("Rate"));
-            }
+        // Power generation when closed and open
+        [KSPField(isPersistant = false)]
+        public float PowerGenerationDeployed;
+        [KSPField(isPersistant = false)]
+        public float PowerGenerationRetracted;
+        [KSPField(isPersistant = false)]
+        public float PowerGenerationResponseRate;
+
+        // current generation
+        public float currentGeneration;
+
+        private IFissionGeneratorAnimator animator;
+
+        // Reactor activation actions
+        [KSPEvent(guiActive = true, guiName = "Enable Reactor", active = true)]
+        public void Enable()
+        {
+
+            Enabled = true;
+        }
+        [KSPEvent(guiActive = true, guiName = "Disable Reactor", active = false)]
+        public void Disable()
+        {
+            GeneratorStatus = "Reactor Offline";
+            Enabled = false;
+        }
+        [KSPAction("Enable Reactor")]
+        public void EnableAction(KSPActionParam param) { Enable(); }
+
+        [KSPAction("Disable Reactor")]
+        public void DisableAction(KSPActionParam param) { Disable(); }
+
+        [KSPAction("Toggle Reactor")]
+        public void ToggleAction(KSPActionParam param)
+        {
+            Enabled = !Enabled;
         }
 
-        private class DefaultExtractorAnimator : IExtractorAnimator
-        {
-            public ExtractorState CurrentState { get; private set; }
-            public void Deploy() { CurrentState = ExtractorState.Deployed; }
-            public void Retract() { CurrentState = ExtractorState.Retracted; }
+        // Reactor Status string
+        [KSPField(isPersistant = false, guiActive = true, guiName = "Output")]
+        public string GeneratorStatus;
 
-            public DefaultExtractorAnimator()
-            {
-                CurrentState = ExtractorState.Retracted;
-            }
-        }
-
-        private IExtractorAnimator animator;
-
-        private List<Resource> resources;
-
-        [KSPField(isPersistant = false)]
-        public float PowerConsumption;
-
-        [KSPField(isPersistant = false, guiActive = true, guiName = "Status")]
-        public string Status;
-
-        [KSPField(isPersistant = false)]
-        public string HeadTransform;
-
-        [KSPField(isPersistant = false)]
-        public string TailTransform;
-
-        [KSPField(isPersistant = false)]
-        public float HeadOffset;
-
-        [KSPField(isPersistant = false)]
-        public float TailOffset;
-
-        private Transform headTransform;
-        private Transform tailTransform;
-
-        private KethaneParticleEmitter[] emitters;
-
-        public override void OnStart(PartModule.StartState state)
-        {
-            this.part.force_activate();
-            animator = part.Modules.OfType<IExtractorAnimator>().SingleOrDefault() ?? new DefaultExtractorAnimator();
-
-            headTransform = this.part.FindModelTransform(HeadTransform);
-            tailTransform = this.part.FindModelTransform(TailTransform);
-
-            if (state == StartState.Editor) { return; }
-            if (FlightGlobals.fetch == null) { return; }
-
-            emitters = part.Modules.OfType<KethaneParticleEmitter>().ToArray();
-
-            foreach (var emitter in emitters)
-            {
-                emitter.Setup();
-                emitter.EmitterTransform.parent = headTransform;
-                emitter.EmitterTransform.localRotation = Quaternion.identity;
-            }
-        }
-
-        public override void OnLoad(ConfigNode node)
-        {
-            if (part.partInfo != null) { node = GameDatabase.Instance.GetConfigs("PART").Where(c => part.partInfo.name == c.name.Replace('_', '.')).Single().config.GetNodes("MODULE").Where(n => n.GetValue("name") == moduleName).Single(); }
-            resources = node.GetNodes("Resource").Select(n => new Resource(n)).ToList();
-        }
-
-        [KSPEvent(guiActive = true, guiName = "Deploy Drill", active = true)]
-        public void DeployDrill()
+        // Radiator Actions
+        [KSPEvent(guiActive = true, guiName = "Deploy Radiators", active = true)]
+        public void DeployRadiators()
         {
             animator.Deploy();
         }
 
-        [KSPEvent(guiActive = true, guiName = "Retract Drill", active = false)]
-        public void RetractDrill()
+        [KSPEvent(guiActive = true, guiName = "Retract Radiators", active = false)]
+        public void RetractRadiators()
         {
             animator.Retract();
         }
 
-        [KSPAction("Deploy Drill")]
-        public void DeployDrillAction(KSPActionParam param)
+        [KSPAction("Deploy Radiators")]
+        public void DeployRadiatorsAction(KSPActionParam param)
         {
-            DeployDrill();
+            DeployRadiators();
         }
 
-        [KSPAction("Retract Drill")]
-        public void RetractDrillAction(KSPActionParam param)
+        [KSPAction("Retract Radiators")]
+        public void RetractRadiatorsAction(KSPActionParam param)
         {
-            RetractDrill();
+            RetractRadiators();
         }
 
-        [KSPAction("Toggle Drill")]
-        public void ToggleDrillAction(KSPActionParam param)
+        [KSPAction("Toggle Radiators")]
+        public void ToggleRadiatorsAction(KSPActionParam param)
         {
-            if (animator.CurrentState == ExtractorState.Deployed || animator.CurrentState == ExtractorState.Deploying)
+            if (animator.CurrentState == RadiatorState.Deployed || animator.CurrentState == RadiatorState.Deploying)
             {
-                RetractDrill();
+                RetractRadiators();
             }
-            else if (animator.CurrentState == ExtractorState.Retracted || animator.CurrentState == ExtractorState.Retracting)
+            else if (animator.CurrentState == RadiatorState.Retracted || animator.CurrentState == RadiatorState.Retracting)
             {
-                DeployDrill();
+                DeployRadiators();
             }
         }
 
+        // Radiator Status string
+        [KSPField(isPersistant = false, guiActive = true, guiName = "Radiator Status")]
+        public string RadiatorStatus;
+
+
+        // Info for ui
         public override string GetInfo()
         {
-            return String.Concat(resources.Select(r => String.Format("{0} Rate: {1:F2}L/s\n", r.Name, r.Rate)).ToArray()) + String.Format("Power Consumption: {0:F2}/s", PowerConsumption);
+            return String.Format("Maximum Power: {0:F2}/s", currentGeneration);
         }
 
-        public override void OnUpdate()
+        // Implement the fissiongeneratoranimator class
+        private class DefaultFissionGeneratorAnimator : IFissionGeneratorAnimator
         {
-            var retracted = (animator.CurrentState == ExtractorState.Retracted);
-            var deployed = (animator.CurrentState == ExtractorState.Deployed);
-            if (Events["DeployDrill"].active != retracted || Events["RetractDrill"].active != deployed)
+            public RadiatorState CurrentState { get; private set; }
+            public void Deploy() { CurrentState = RadiatorState.Deployed; }
+            public void Retract() { CurrentState = RadiatorState.Retracted; }
+
+            public DefaultFissionGeneratorAnimator()
             {
-                Events["DeployDrill"].active = retracted;
-                Events["RetractDrill"].active = deployed;
-                foreach (var window in GameObject.FindObjectsOfType(typeof(UIPartActionWindow)).OfType<UIPartActionWindow>().Where(w => w.part == part))
-                {
-                    window.displayDirty = true;
-                }
+                CurrentState = RadiatorState.Retracted;
             }
-            Status = animator.CurrentState.ToString();
+        }
 
-            if (animator.CurrentState != ExtractorState.Retracted)
+
+        public override void OnStart(PartModule.StartState state)
+        {
+            this.part.force_activate();
+            animator = part.Modules.OfType<IFissionGeneratorAnimator>().SingleOrDefault() ?? new FissionGeneratorAnimator();
+
+            // Figure out what the current production should be
+            if (Enabled)
             {
-                RaycastHit hitInfo;
-                var hit = raycastGround(out hitInfo);
-
-                foreach (var emitter in emitters.Where(e => e.Label != "gas"))
+                if (animator.CurrentState != RadiatorState.Deployed)
                 {
-                    emitter.Emit = hit;
+                    currentGeneration = PowerGenerationRetracted;
                 }
-                if (hit)
+                else
                 {
-                    foreach (var emitter in emitters)
-                    {
-                        emitter.EmitterPosition = headTransform.InverseTransformPoint(hitInfo.point);
-                    }
-                }
-
-                foreach (var emitter in emitters.Where(e => e.Label == "gas"))
-                {
-                    if (animator.CurrentState == ExtractorState.Deployed)
-                    {
-                        emitter.Emit = hit && KethaneData.Current.GetDepositUnder("Kethane", this.vessel) != null;
-                    }
-                    else
-                    {
-                        emitter.Emit = false;
-                    }
+                    currentGeneration = PowerGenerationDeployed;
                 }
             }
             else
             {
-                foreach (var emitter in emitters)
-                {
-                    emitter.Emit = false;
-                }
+                currentGeneration = 0f;
             }
+
         }
 
+        public override void OnLoad(ConfigNode node)
+        { }
+
+        // Update function for animation, UI
+        public override void OnUpdate()
+        {
+            Events["Enable"].active = !Enabled;
+            Events["Disable"].active = Enabled;
+
+            var retracted = (animator.CurrentState == RadiatorState.Retracted);
+            var deployed = (animator.CurrentState == RadiatorState.Deployed);
+
+            if (Events["DeployRadiators"].active != retracted || Events["RetractRadiators"].active != deployed)
+            {
+                Events["DeployRadiators"].active = retracted;
+                Events["RetractRadiators"].active = deployed;
+            }
+            RadiatorStatus = animator.CurrentState.ToString();
+
+            // Update GUI 
+            GeneratorStatus = String.Format("Generation rate: {0:F2}/s", currentGeneration);
+
+        }
+
+        // Fixed update function. Actually does the gameplay stuff
         public override void OnFixedUpdate()
         {
-            if (animator.CurrentState != ExtractorState.Deployed) { return; }
-            if (!raycastGround()) { return; }
-
-            var energyRequest = this.PowerConsumption * TimeWarp.fixedDeltaTime;
-            var energyRatio = this.part.RequestResource("ElectricCharge", energyRequest) / energyRequest;
-
-            foreach (var resource in resources)
+            if (Enabled)
             {
-                var deposit = KethaneData.Current.GetDepositUnder(resource.Name, this.vessel);
-                if (deposit == null) { continue; }
+                // if radiators are not open, move towards closed generation at response rate
+                if (animator.CurrentState != RadiatorState.Deployed)
+                {
+                    currentGeneration = Mathf.MoveTowards(currentGeneration, PowerGenerationRetracted, TimeWarp.fixedDeltaTime * PowerGenerationResponseRate);
+                    this.part.RequestResource("ElectricCharge", -TimeWarp.fixedDeltaTime * currentGeneration);
+                }
+                else
+                {
+                    currentGeneration = Mathf.MoveTowards(currentGeneration, PowerGenerationDeployed, TimeWarp.fixedDeltaTime * PowerGenerationResponseRate);
+                    this.part.RequestResource("ElectricCharge", -TimeWarp.fixedDeltaTime * currentGeneration);
+                }
 
-                double amount = TimeWarp.fixedDeltaTime * resource.Rate * energyRatio;
-                amount = Math.Min(amount, deposit.Quantity);
-                deposit.Quantity += this.part.RequestResource(resource.Name, -amount);
             }
-        }
+            else
+            {
+                currentGeneration = Mathf.MoveTowards(currentGeneration, 0f, TimeWarp.fixedDeltaTime * PowerGenerationResponseRate);
+                this.part.RequestResource("ElectricCharge", -TimeWarp.fixedDeltaTime * currentGeneration);
 
-        private bool raycastGround()
-        {
-            RaycastHit hitInfo;
-            return raycastGround(out hitInfo);
-        }
-
-        private bool raycastGround(out RaycastHit hitInfo)
-        {
-            var mask = 1 << 15;
-            var direction = headTransform.position - tailTransform.position;
-            return Physics.Raycast(tailTransform.position - direction.normalized * TailOffset, direction, out hitInfo, direction.magnitude + HeadOffset + TailOffset, mask);
+            }
         }
     }
 }
